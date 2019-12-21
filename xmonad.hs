@@ -3,17 +3,18 @@
 module Main (main) where
 
 -- TODO dynamic workspaces
--- TODO
+-- import XMonad.Prompt.AppendFile
+-- import XMonad.Prompt.FuzzyMatch
+-- import XMonad.Actions.DynamicWorkspaces
+-- import XMonad.Actions.CopyWindow(copy)
 
 ------------------------------------------------------------------------------
 -- XMonad.Actions.FloatSnap
 import qualified Data.Tree as Tree
-import qualified Data.List as L (find, findIndex, tails)
 import qualified Data.Monoid as Monoid
 
-import Control.Monad (replicateM_, when, join, filterM)
-import Data.Maybe (maybeToList)
-import System.Exit
+import Control.Monad (replicateM_, when, join)
+import System.Exit (exitSuccess)
 import System.Environment (getArgs)
 import System.IO (hPutStrLn, stderr)
 
@@ -21,80 +22,37 @@ import XMonad
 import XMonad.Actions.Commands
 import XMonad.Actions.CycleWS
 import XMonad.Actions.RotSlaves
-import XMonad.Actions.Search
-import XMonad.Actions.Warp (banish, Corner(UpperLeft))
-import XMonad.Actions.WindowGo
-import XMonad.Config.Desktop
-import XMonad.Hooks.DynamicLog
-import XMonad.Hooks.EwmhDesktops
-import XMonad.Hooks.FadeWindows (isFloating)
-import XMonad.Hooks.ManageDocks
+import XMonad.Actions.SpawnOn (manageSpawn)
+import XMonad.Config.Desktop (desktopConfig)
+import XMonad.Hooks.DynamicLog (dynamicLogString, xmonadPropLog)
+import XMonad.Hooks.EwmhDesktops (ewmh, fullscreenEventHook)
+import XMonad.Hooks.ManageDocks (avoidStruts, docksEventHook)
 import XMonad.Hooks.ManageHelpers
-import XMonad.Hooks.ServerMode
-import XMonad.Layout.BinarySpacePartition (emptyBSP)
+import XMonad.Hooks.ServerMode (serverModeEventHookCmd')
 import XMonad.Layout.Fullscreen (fullscreenManageHook)
-import XMonad.Layout.Grid
-import XMonad.Layout.MouseResizableTile
-import XMonad.Layout.MultiToggle as MT
-import XMonad.Layout.MultiToggle.Instances as MTI
-import XMonad.Layout.NoBorders
+import XMonad.Layout.Grid (Grid(..))
+import XMonad.Layout.MultiToggle as MT -- (Toggle, Transformer, transform)
+import XMonad.Layout.MultiToggle.Instances as MTI (StdTransformers(..))
 import XMonad.Layout.Spacing -- (spacingRaw, Border)
-import XMonad.Layout.ResizableTile (ResizableTall(..))
-import XMonad.Layout.ThreeColumns
+import XMonad.Layout.ThreeColumns (ThreeCol(..))
 import XMonad.Prompt
-import XMonad.Prompt.ConfirmPrompt
-import XMonad.Prompt.Shell
-import XMonad.Util.EZConfig
-import XMonad.Util.Paste
-import XMonad.Util.SpawnOnce
-import XMonad.Util.WindowProperties
+import XMonad.Prompt.Shell (shellPrompt)
+import XMonad.Prompt.AppLauncher (launchApp)
+import XMonad.Util.EZConfig (additionalKeysP)
+import XMonad.Util.SpawnOnce (spawnOnce)
 
-import XMonad.Prompt.AppLauncher
-import XMonad.Prompt.AppendFile
-import XMonad.Prompt.FuzzyMatch
-
-import XMonad.Layout.WindowSwitcherDecoration
-import XMonad.Layout.DraggingVisualizer
-import XMonad.Layout.Decoration
-import XMonad.Layout.DecorationAddons
-import XMonad.Util.Themes
--- layoutHook = windowSwitcherDecorationWithButtons (shrinkText :: DefaultShrinker) defaultThemeWithButtons (draggingVisualizer myLayouts)
-
-import XMonad.Actions.DynamicWorkspaces
-import XMonad.Actions.CopyWindow(copy)
-
-import qualified XMonad.Core as XM (Query)
-import qualified XMonad.Layout.Magnifier as Magnifier
 import qualified XMonad.StackSet as W
-
--- import XMonad.Layout.Combo
--- import XMonad.Layout.Tabbed
--- import XMonad.Layout.TwoPane
+import qualified XMonad.Layout.Magnifier as Magnifier
 
 import QsrTile
 import QsrFloatTile
 import QsrFloat
-import BorderResize
-import FlexibleResize
 import XDecoration
-
--- xmonad user state
-import qualified XMonad.Util.ExtensibleState as XS
-import XMonad.Actions.SpawnOn
-import XMonad.Util.XUtils
-import System.Process (system)
+import XState
+import PositionStore
+import Util
 
 
-
-
-
-data UserState = UserState 
-  { _terminal :: Maybe (Either Window Window)
-  } deriving (Read, Show, Typeable)
-
-instance ExtensionClass UserState where
-  initialValue = UserState { _terminal = Nothing }
-  extensionType = PersistentExtension  -- survive mod-q
 
 -- | Colorize a window depending on it's className.
 -- fromClassName :: Window -> Bool -> X ()
@@ -105,27 +63,6 @@ instance ExtensionClass UserState where
 -- (-?>) :: Query Bool -> ManageHook -> MaybeManageHook
 -- className =? "kitty" :: Query Bool
 --           -?> doFloat
-
-------------------------------------------------------------------------------
--- custom toggles
-data GRID = GRID deriving (Read, Show, Eq, Typeable)
-instance Transformer GRID Window where
-  transform GRID x k = k (GridRatio (2/2)) (const x)
-
-data MAXIMIZE = MAXIMIZE deriving (Read, Show, Eq, Typeable)
-instance Transformer MAXIMIZE Window where
-  transform MAXIMIZE x k = k Full (const x)
-
-
-data QTILE = QTILE deriving (Read, Show, Eq, Typeable)
-instance Transformer QTILE Window where
-  transform QTILE x k = k l' (const x) where
-    l' = qsrGTile ||| qsr3Tile
-    l = threeColumns ||| threecMaster ||| threecSlave
-    threeColumns = ThreeColMid 1 (3/100) (1/2)
-    threecMaster = ThreeColMid 1 (3/100) (6/8)
-    threecSlave = ThreeColMid 1 (3/100) (3/8)
-
 
 ------------------------------------------------------------------------------
 -- | xmonad server client cmds
@@ -177,7 +114,7 @@ rootConfig = desktopConfig
   , focusFollowsMouse = False
   -- xmonad startup
   , startupHook = do
-      -- spawnOnce "systemctl --user restart quasar-terminal"
+      spawnOnce "/etc/xautolock-locker"
       addEWMHFullscreen
       startupHook desktopConfig
   , layoutHook = myLayouts
@@ -198,42 +135,35 @@ rootConfig = desktopConfig
   }
 
 ------------------------------------------------------------------------------
--- youtube (firefox) and other fullscreen stuff
-addNETSupported :: Atom -> X ()
-addNETSupported x   = withDisplay $ \dpy -> do
-    r               <- asks theRoot
-    a_NET_SUPPORTED <- getAtom "_NET_SUPPORTED"
-    a               <- getAtom "ATOM"
-    liftIO $ do
-       sup <- (join . maybeToList) <$> getWindowProperty32 dpy a_NET_SUPPORTED r
-       when (fromIntegral x `notElem` sup) $
-         changeProperty32 dpy r a_NET_SUPPORTED a propModeAppend [fromIntegral x]
-
-addEWMHFullscreen :: X ()
-addEWMHFullscreen   = do
-    wms <- getAtom "_NET_WM_STATE"
-    wfs <- getAtom "_NET_WM_STATE_FULLSCREEN"
-    mapM_ addNETSupported [wms, wfs]
-
-
-------------------------------------------------------------------------------
 -- | Customize layouts.
-myLayouts = mkToggle1 FULL
-  $ avoidStruts  -- no overlap dock, except when fullscreen
-  $ spaced 3
-  $ mkToggle (MIRROR ?? GRID ?? MAXIMIZE ?? EOT)
-  $ decorate
-  $ mkToggle (QTILE ?? EOT)
-  $ qsrFloatTile ||| borderResize qsrFloat
+myLayouts = spaced 3
+  $ mkToggle (FULL ?? MAXIMIZE ?? GRID ?? EOT)
+  $ avoidStruts
+  $ mkToggle (GRID ?? EOT)
+  $ decorateTile qsrFloatTile
+    ||| decorateFloat qsrFloat 
+    ||| decorateTile qsrGTile
   where
     spaced d = spacingRaw True (Border d d d d) True (Border d d d d) True
-    -- title bar is 'desktop' type window, made transparent by compton
-    decorate l = xDecoration shrinkText decorationTheme l
-
+    
     -- add to myLayouts otherwise type ambiguity
     -- http://hackage.haskell.org/package/xmonad-contrib-0.16/docs/XMonad-Layout-Combo.html
     -- twopane = combineTwo (TwoPane 0.03 0.5) (tabbed (shrinkText :: DefaultShrinker) defaultThemeWithButtons) (tabbed (shrinkText :: DefaultShrinker) defaultThemeWithButtons)
     -- http://hackage.haskell.org/package/xmonad-contrib-0.16/docs/XMonad-Layout-ComboP.html
+
+-- custom toggles
+data GRID = GRID deriving (Read, Show, Eq, Typeable)
+instance Transformer GRID Window where
+  transform GRID x k = k (avoidStruts l) (const x) where
+    l = GridRatio (2/2) ||| threeColumns ||| threecMaster ||| threecSlave
+    threeColumns = ThreeColMid 1 (3/100) (1/2)
+    threecMaster = ThreeColMid 1 (3/100) (6/8)
+    threecSlave = ThreeColMid 1 (3/100) (3/8)
+
+data MAXIMIZE = MAXIMIZE deriving (Read, Show, Eq, Typeable)
+instance Transformer MAXIMIZE Window where
+  transform MAXIMIZE x k = k (avoidStruts Full) (const x)
+
 
 ------------------------------------------------------------------------------
 -- | Manipulate windows as they are created.
@@ -242,11 +172,7 @@ myLayouts = mkToggle1 FULL
 myManageHook = composeOne
   [ className =? "Tilda" -?> doFloat
   -- , className =? "kitty" -?> doFullFloat
-  , className =? "quasar-terminal-kitty" -?> do
-      w <- ask
-      liftX (XS.put
-       (UserState { _terminal = Just (Right w) }))
-      doF id
+  , className =? "quasar-terminal-kitty" -?> quasarTerminalKittyHook
   , appName =? "Terminator Preferences" -?> doFloat
   , className =? ".terminator-wrapped" -?> rectFloat 0 0 1 1
   -- control applications
@@ -266,34 +192,6 @@ myManageHook = composeOne
       rectFloat x y w h = doRectFloat $ W.RationalRect x y w h
 
 ------------------------------------------------------------------------------
-ifTerminal t f =
-  ifWindows (className =? ".terminator-wrapped") (\_ -> t) f
-
-ifNotTermSend k a = ifTerminal (sendKey noModMask k) a
-
-doFullscreen = do
-  sendMessage (MT.Toggle FULL)
-  raiseFocusedWindow
-  -- sendKey noModMask xK_F11
-
--- TODO restart on terminal exit
-terminalToggle :: X ()
-terminalToggle = do
-  -- system "ps -e | grep .kitty-wrapped | grep -q"
-  UserState wterm <- XS.get :: X UserState
-  case wterm of
-    Nothing -> spawn "systemctl --user restart quasar-terminal-kitty"
-    Just (Left w) -> do
-      XS.put (UserState 
-        { _terminal = Just (Right w) })
-      reveal w
-      manage w
-    Just (Right w) -> do
-      XS.put (UserState 
-        { _terminal = Just (Left w) })
-      hide w
-      unmanage w
-
 -- | Keybindings
 keyConfig =
   [ ("M-S-q",   shellPrompt promptConfig)
@@ -302,12 +200,13 @@ keyConfig =
 
   --
   , ("M-k",   launchApp promptConfig "thunar")  -- open dir in thunar
+  , ("M-c",   posStoreClear)
   -- , ("M-k",   appendFilePrompt def "/home/me/NOTES")
 
   -- fast actions bound to f-keys
   -- , ("<F1>",)   -- used by terminator
   , ("<F2>", sendMessage NextLayout)
-  , ("<F3>", sendMessage (MT.Toggle QTILE))
+  , ("<F3>", sendMessage (MT.Toggle GRID))
   , ("<F4>", kill)
   , ("<F5>", rotAllUp)
   , ("<F6>", windows W.focusDown)
@@ -322,33 +221,35 @@ keyConfig =
 
 
   -- mouse actions
-  , ("M-m", banish UpperLeft)
+  -- , ("M-m", banish UpperLeft)
 
   -- cycle windows
-  -- , ("M-<Tab>", rotAllUp)  -- TODO handle floating better
-  -- , ("M-S-<Tab>", rotAllDown)
   , ("M-<Tab>", windows W.focusUp)
   , ("M-S-<Tab>", windows W.focusDown)
   , ("M-`", windows W.focusDown)
   , ("M-S-`", windows W.focusUp)
 
   -- move windows across workspaces
-  , ("M-d", sendMessage (MT.Toggle MAXIMIZE))
-  , ("M-<Up>", sendMessage (MT.Toggle MAXIMIZE))
   , ("M-<Right>", moveTo Next NonEmptyWS)
   , ("M-<Left>", moveTo Prev NonEmptyWS)
-  , ("M-S-<Right>", shiftToNext >> nextWS)
-  , ("M-S-<Left>", shiftToPrev >> prevWS)
-
+  
+  , ("M-S-<Right>", windows W.swapUp)
+  , ("M-S-<Left>", windows W.swapDown)
+  , ("M-S-<Up>", shiftToPrev >> prevWS)
+  , ("M-S-<Down>", shiftToNext >> nextWS)
+  
   -- manage windows
   , ("M-w",   kill)
-
-  -- switch layouts
-  , ("M-t", sendMessage (MT.Toggle QTILE))
-  , ("M-z", sendMessage NextLayout)
+  
   , ("M-f", doFullscreen)
+  , ("M-d", sendMessage (MT.Toggle MAXIMIZE))
+  , ("M-<Up>", sendMessage (MT.Toggle MAXIMIZE))
+  , ("M-<Down>", sendMessage (MT.Toggle MAXIMIZE))
+  
+  -- switch layouts
+  , ("M-t", sendMessage (MT.Toggle GRID))
+  , ("M-z", sendMessage NextLayout)
   , ("M-x", sendMessage (MT.Toggle MIRROR))
-  , ("M-a", sendMessage Magnifier.Toggle)
   , ("M-<Esc>", sendMessage (MT.Toggle GRID))
 
   -- desktop launcher and terminal
@@ -381,73 +282,6 @@ keyConfig =
 
   ]
 
-
-------------------------------------------------------------------------------
--- | util functions
-
-raiseFocusedWindow :: X ()
-raiseFocusedWindow =
-  withDisplay $ \d ->
-    withFocused $ \w ->
-      io $ raiseWindow d w
-  -- raiseWindow :: Display -> Window -> IO ()
-
-raiseFocusedWindowConditional :: (Window -> X Bool) -> X ()
-raiseFocusedWindowConditional cond =
-  withFocused $ \w -> do
-    cond w >>= \case
-      False -> return ()
-      True -> raiseFocusedWindow
-
-raiseFocusedIfFloating :: X ()
-raiseFocusedIfFloating = raiseFocusedWindowConditional (runQuery isFloating)
-
-withQuery :: XM.Query a -> (a -> X ()) -> X ()
-withQuery q f = withFocused $ \w -> runQuery q w >>= f
-
-findWindow :: (Window -> X Bool) -> X [Window]
-findWindow condition = do
-  windows <- gets (W.index . windowset)  -- MonadState XState X
-  filterM condition windows
-
-
-------------------------------------------------------------------------------
--- | server send command
-sendCommand :: String -> IO ()
-sendCommand = sendCommand' "XMONAD_COMMAND"
-
-sendCommand' :: String -> String -> IO ()
-sendCommand' addr s = do
-  d   <- openDisplay ""
-  rw  <- rootWindow d $ defaultScreen d
-  a <- internAtom d addr False
-  m <- internAtom d s False
-  allocaXEvent $ \e -> do
-    setEventType e clientMessage
-    setClientMessageEvent e rw a 32 m currentTime
-    sendEvent d rw False structureNotifyMask e
-    sync d False
-
-
-------------------------------------------------------------------------------
--- | unused currently
-
--- unused because xautolock wants lock app to not fork
-subIndex :: Eq a => [a] -> [a] -> Maybe Int
-subIndex substr str = L.findIndex (isPrefixOf substr) (L.tails str)
-
-quasarLock :: X ()
-quasarLock = withFocused $ \w -> do
-  windowTitle <- runQuery title w  -- title :: Query String
-  let yt = subIndex " - YouTube - " windowTitle
-  let vlc = subIndex " - VLC media player" windowTitle
-  if yt == Nothing && vlc == Nothing
-    then spawn "xautolock -locknow"
-    else spawn "(pacmd list-sink-inputs | grep 'state: RUNNING') || xautolock -locknow"
-
-quasarSuspend :: X ()
-quasarSuspend =
-  spawn "(pacmd list-sink-inputs | grep 'state: RUNNING') || systemctl suspend"
 
 
 ------------------------------------------------------------------------------

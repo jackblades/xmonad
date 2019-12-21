@@ -22,14 +22,19 @@
 module XDecoration
     ( -- * Usage:
       -- $usage
+      decorateTile,
+      decorateFloat,
       xDecoration,
       XDecoration,
       decorationTheme,
     ) where
 
 import XMonad
+import BorderResize
+import FlexibleResize  -- TODO
 import XMonad.Layout.Decoration
 import XMonad.Layout.DecorationAddons
+import XMonad.Layout.NoFrillsDecoration
 import XMonad.Util.Font
 
 import XMonad.Layout.DraggingVisualizer
@@ -126,6 +131,10 @@ performWindowSwitching win =
 
 
 ------------------------------------------------------------------------------
+-- title bar is 'desktop' type window, made transparent by compton
+decorateTile l = xDecoration shrinkText decorationTheme l
+decorateFloat l = noFrillsDeco shrinkText decorationTheme (borderResize l)
+
 xDecoration :: (Eq a, Shrinker s) 
             => s 
             -> Theme

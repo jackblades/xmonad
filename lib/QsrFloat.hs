@@ -26,10 +26,10 @@ module QsrFloat
     ) where
 
 import XMonad
-import XMonad.Util.PositionStore
+import PositionStore
 import qualified XMonad.StackSet as S
 import XMonad.Layout.WindowArranger
-import Control.Monad(when)
+import Control.Monad(when,forM_)
 import Data.Maybe(isJust)
 import Data.List(nub)
 
@@ -100,9 +100,10 @@ instance LayoutClass QsrFloat Window where
             Just $ QsrFloat (Just rect, paintOrder)
         | otherwise = Nothing
 
+--
 updatePositionStore :: (Window, Rectangle) -> Rectangle -> X ()
-updatePositionStore (w, rect) sr 
-    = modifyPosStore $ \ps -> posStoreInsert ps w rect sr
+updatePositionStore (w, rect) sr =
+    modifyPosStore $ \ps -> posStoreInsert ps w rect sr
 
 reorder :: (Eq a) => [(a, b)] -> [a] -> [(a, b)]
 reorder wrs order =
