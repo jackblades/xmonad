@@ -62,7 +62,18 @@ data QsrFloatTile a = QsrFloatTile (Maybe Rectangle, [a]) deriving (Show, Read)
 instance LayoutClass QsrFloatTile Window where
     description _ = "QsrFloatTile"
     -- doLayout :: layout a -> Rectangle -> Stack a -> X ([(a, Rectangle)], Maybe (layout a)) 
-    doLayout (QsrFloatTile _) rect (S.Stack focus up down) = do
+    doLayout (QsrFloatTile _) (Rectangle _ _ w h) (S.Stack focus up down) = do
+        let fi = fromIntegral
+        let scalex x = round (x * fi w / 1920)
+        let scaley y = round (y * fi h / 1080)
+
+        let xshift = scalex 500
+        let xdef = scalex 75
+        let ydef = scaley 100
+        
+        let wdef = scalex 1300
+        let hdef = scaley 800
+
         -- windows started in order: a, b, c
         -- S.Stack w [] [b,a] when looking at c
         -- S.Stack w [c] [a] when looking at b
@@ -71,10 +82,10 @@ instance LayoutClass QsrFloatTile Window where
         let ldown = fromIntegral (length down)
             k = 1 + ldown + fromIntegral (length up)
 
-            shifty i k = 100
+            shifty i k = ydef
             -- shifty i k = 50 + i * (div 130 (k-1))
-            shiftx i k = 75 + if k < 2 then 0 else i * div 500 (k-1)
-            rects w i k = (w, Rectangle (shiftx i k) (shifty i k) 1300 800)
+            shiftx i k = xdef + if k < 2 then 0 else i * div xshift (k-1)
+            rects w i k = (w, Rectangle (shiftx i k) (shifty i k) wdef hdef)
         return $ case k of
             1 -> ( [rects focus 0 1], Nothing )
             _ -> ( [rects focus ldown k] 

@@ -140,9 +140,9 @@ myLayouts = spaced 3
   $ mkToggle (FULL ?? MAXIMIZE ?? GRID ?? EOT)
   $ avoidStruts
   $ mkToggle (GRID ?? EOT)
-  $ decorateTile qsrFloatTile
+  $ qsrFloatTile
     ||| decorateFloat qsrFloat 
-    ||| decorateTile qsrGTile
+    ||| qsrGTile
   where
     spaced d = spacingRaw True (Border d d d d) True (Border d d d d) True
     
@@ -183,7 +183,7 @@ myManageHook = composeOne
   , className =? ".arandr-wrapped" -?> rectFloat 0.51 0.2 0.4 0.6
   , className =? "Wicd-client.py" -?> rectFloat 0.59 0.2 0.4 0.6
   -- generic actions
-  , isFullscreen -?> doFullFloat
+  -- , isFullscreen -?> doFullFloat
   , isDialog -?> doCenterFloat
   -- Move transient windows to their parent:
   , transience
@@ -199,8 +199,9 @@ keyConfig =
   , ("M-<Return>", spawn "kitty")
 
   --
-  , ("M-k",   launchApp promptConfig "thunar")  -- open dir in thunar
+  , ("M-k",   launchApp promptConfig "thunar")  --
   , ("M-c",   posStoreClear)
+  -- , ("M-k",   launchApp promptConfig "thunar")  -- open dir in thunar
   -- , ("M-k",   appendFilePrompt def "/home/me/NOTES")
 
   -- fast actions bound to f-keys

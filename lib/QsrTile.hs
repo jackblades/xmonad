@@ -70,7 +70,7 @@ data QsrTile a = QsrTile TileType (Maybe Rectangle, [a]) deriving (Show, Read)
 instance LayoutClass QsrTile Window where
     description _ = "QsrTile"
     -- doLayout :: layout a -> Rectangle -> Stack a -> X ([(a, Rectangle)], Maybe (layout a)) 
-    doLayout (QsrTile tileType _) rect st = case st of 
+    doLayout (QsrTile tileType _) (Rectangle _ _ w h) st = case st of 
         -- 1 window
         S.Stack focus [] [] -> return $ ( [rects focus 0] , Nothing )
         -- 2 windows
@@ -85,8 +85,12 @@ instance LayoutClass QsrTile Window where
                 (wrs, _) <- doLayout (ThreeColMid 1 (3/100) (1/2)) rectp st
                 return (wrs, Nothing)
 
-        where rects w i = (w, Rectangle (50 + 910*i) 75 900 900)
-              rectp = Rectangle 50 50 1810 1000
+        where fi = fromIntegral
+              scalex x = round (x * fi w / 1920)
+              scaley y = round (y * fi h / 1080)
+
+              rects w i = (w, Rectangle (scalex 50 + scalex 910 * i) (scaley 75) (scalex 900) (scaley 900))
+              rectp = Rectangle (scalex 50) (scaley 50) (scalex 1810) (scaley 1000)
     
     pureMessage (QsrTile tileType (_, paintOrder)) m
         | Just (SetGeometry rect) <- fromMessage m =
