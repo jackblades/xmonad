@@ -142,7 +142,7 @@ myLayouts = spaced 3
   $ mkToggle (GRID ?? EOT)
   $ qsrFloatTile
     ||| decorateFloat qsrFloat 
-    ||| qsrGTile
+    ||| qsrGTile rectScale40
   where
     spaced d = spacingRaw True (Border d d d d) True (Border d d d d) True
     
@@ -155,7 +155,8 @@ myLayouts = spaced 3
 data GRID = GRID deriving (Read, Show, Eq, Typeable)
 instance Transformer GRID Window where
   transform GRID x k = k (avoidStruts l) (const x) where
-    l = GridRatio (2/2) ||| threeColumns ||| threecMaster ||| threecSlave
+    -- l = qsrGTile rectScale1 ||| qsr3Tile rectScale1
+    l = qsrGTile rectScale1 ||| threeColumns ||| threecMaster ||| threecSlave
     threeColumns = ThreeColMid 1 (3/100) (1/2)
     threecMaster = ThreeColMid 1 (3/100) (6/8)
     threecSlave = ThreeColMid 1 (3/100) (3/8)
