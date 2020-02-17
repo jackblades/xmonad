@@ -33,6 +33,8 @@ import Control.Monad(when,forM_)
 import Data.Maybe(isJust)
 import Data.List(nub)
 
+import Data.Ratio ((%))
+
 -- $usage
 -- You can use this module with the following in your @~\/.xmonad\/xmonad.hs@:
 --
@@ -59,17 +61,9 @@ instance LayoutClass QsrFloat Window where
     description _ = "QsrFloat"
     -- doLayout :: layout a -> Rectangle -> Stack a -> X ([(a, Rectangle)], Maybe (layout a)) 
     doLayout (QsrFloat (maybeChange, paintOrder)) sr@(Rectangle _ _ w h) (S.Stack focus up down) = do
-        let fi = fromIntegral
-        let scalex x = round (x * fi w / 1920)
-        let scaley y = round (y * fi h / 1080)
-
-        let xdef = scalex 75
-        let xshift = scalex 500
-        let ydef = scaley 50
-        let yshift = scalex 130
-        
-        let wdef = scalex 1300
-        let hdef = scaley 800
+        let wy = 100 % 1080
+        let dw = 1300 % 1920
+        let dh = 800 % 1080
 
         -- windows started in order: a, b, c
         -- S.Stack w [] [b,a] when looking at c
@@ -81,9 +75,10 @@ instance LayoutClass QsrFloat Window where
         let ldown = fromIntegral (length down)
             k = 1 + ldown + fromIntegral (length up)
 
-            shifty i k = ydef + if k < 2 then 0 else i * div yshift (k-1)
-            shiftx i k = xdef + if k < 2 then 0 else i * div xshift (k-1)
-            rects w i k = Rectangle (shiftx i k) (shifty i k) wdef hdef
+            shifty i k = 50 + if k < 2 then 0 else i * div 130 (k-1)
+            shiftx i k = 75 + if k < 2 then 0 else i * div 500 (k-1)
+            rscale i k = S.RationalRect (shiftx i k % 1920) (shifty i k % 1080) dw dh
+            rects w i k = scaleRationalRect sr $ rscale i k
 
             -- 
             pSQ posStore sr' w' i k = 

@@ -37,6 +37,8 @@ import Data.List(nub)
 import BorderResize
 import XMonad.Layout.NoFrillsDecoration
 
+import Data.Ratio ((%))
+
 -- $usage
 -- You can use this module with the following in your @~\/.xmonad\/xmonad.hs@:
 --
@@ -62,17 +64,10 @@ data QsrFloatTile a = QsrFloatTile (Maybe Rectangle, [a]) deriving (Show, Read)
 instance LayoutClass QsrFloatTile Window where
     description _ = "QsrFloatTile"
     -- doLayout :: layout a -> Rectangle -> Stack a -> X ([(a, Rectangle)], Maybe (layout a)) 
-    doLayout (QsrFloatTile _) (Rectangle _ _ w h) (S.Stack focus up down) = do
-        let fi = fromIntegral
-        let scalex x = round (x * fi w / 1920)
-        let scaley y = round (y * fi h / 1080)
-
-        let xshift = scalex 500
-        let xdef = scalex 75
-        let ydef = scaley 100
-        
-        let wdef = scalex 1300
-        let hdef = scaley 800
+    doLayout (QsrFloatTile _) wr (S.Stack focus up down) = do
+        let wy = 100 % 1080
+        let dw = 1300 % 1920
+        let dh = 800 % 1080
 
         -- windows started in order: a, b, c
         -- S.Stack w [] [b,a] when looking at c
@@ -82,10 +77,10 @@ instance LayoutClass QsrFloatTile Window where
         let ldown = fromIntegral (length down)
             k = 1 + ldown + fromIntegral (length up)
 
-            shifty i k = ydef
-            -- shifty i k = 50 + i * (div 130 (k-1))
-            shiftx i k = xdef + if k < 2 then 0 else i * div xshift (k-1)
-            rects w i k = (w, Rectangle (shiftx i k) (shifty i k) wdef hdef)
+            shiftx i k = 100 + if k < 2 then 0 else i * div 420 (k-1)
+            rscale i k = S.RationalRect (shiftx i k % 1920) wy dw dh
+            rects w i k = (w, scaleRationalRect wr $ rscale i k)
+
         return $ case k of
             1 -> ( [rects focus 0 1], Nothing )
             _ -> ( [rects focus ldown k] 

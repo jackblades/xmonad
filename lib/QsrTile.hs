@@ -79,6 +79,7 @@ qsr3Tile rscale = QsrTile rscale TTThreeCol (Nothing, [])
 data TileType = TTGrid | TTThreeCol deriving (Show, Read)
 
 data QsrTile a = QsrTile S.RationalRect TileType (Maybe Rectangle, [a]) deriving (Show, Read)
+
 instance LayoutClass QsrTile Window where
     description _ = "QsrTile"
     -- doLayout :: layout a -> Rectangle -> Stack a -> X ([(a, Rectangle)], Maybe (layout a)) 
@@ -105,12 +106,10 @@ gridLayout wr (S.Stack focus up down) = do
     let rows = ceiling (fromIntegral k / fromIntegral cols)
     let rem = Prelude.rem k rows
 
-    let rect w' i = (w', scaleRationalRect wr $ S.RationalRect wx wy dw dh) where
+    let rect w' i = (w', scaleRationalRect wr rscale) where
           (x, y) = divMod i rows
           rowsW = if x == cols - 1 && rem /= 0 then rem else rows
-          (wx, wy) = (x % cols, y % rowsW)
-          dw = 1 % cols
-          dh = 1 % rowsW
+          rscale = S.RationalRect (x % cols) (y % rowsW) (1 % cols) (1 % rowsW)
 
     -- windows started in order: a, b, c
     -- S.Stack w [] [b,a] when looking at c
