@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module QsrFloat
+module Layout.QsrFloat
     ( -- * Usage
       -- $usage
       qsrFloat, QsrFloat
@@ -101,6 +101,7 @@ instance LayoutClass QsrFloat Window where
             updatePositionStore focused sr
         
         return (reorder wrs' paintOrder', Just $ QsrFloat (Nothing, paintOrder'))
+
 
     pureMessage (QsrFloat (_, paintOrder)) m
         | Just (SetGeometry rect) <- fromMessage m =

@@ -20,7 +20,7 @@
 --
 -----------------------------------------------------------------------------
 
-module QsrFloatTile
+module Layout.QsrFloatTile
     ( -- * Usage
       -- $usage
       qsrFloatTile, QsrFloatTile

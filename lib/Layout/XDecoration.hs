@@ -19,7 +19,7 @@
 --
 -----------------------------------------------------------------------------
 
-module XDecoration
+module Layout.XDecoration
     ( -- * Usage:
       -- $usage
       decorateTile,

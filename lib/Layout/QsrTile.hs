@@ -20,7 +20,7 @@
 --
 -----------------------------------------------------------------------------
 
-module QsrTile
+module Layout.QsrTile
     ( -- * Usage
       -- $usage
       rectScale1, rectScale40,
@@ -124,8 +124,23 @@ gridLayout wr (S.Stack focus up down) = do
                 , Nothing )
 
 
+threeColLayout wr (S.Stack focus up down) = do
+    let ldown = fromIntegral (length down)
+    let k = 1 + ldown + fromIntegral (length up)
 
+    let rect w' i = (w', scaleRationalRect wr rscale) where
+          rscale = S.RationalRect 1 1 1 1
 
+    -- windows started in order: a, b, c
+    -- S.Stack w [] [b,a] when looking at c
+    -- S.Stack w [c] [a]  when looking at b
+    -- S.Stack w [b,c] [] when looking at a
 
+    return $ case k of
+        1 -> ( [(focus, scaleRationalRect wr rectScale2)], Nothing )
+        _ -> ( [rect focus ldown] 
+                ++ [rect w i | (w,i) <- zip up [(ldown+1)..(k-1)]]
+                ++ [rect w i | (w,i) <- zip down [(ldown-1), (ldown-2)..0]] 
+                , Nothing )
 
 

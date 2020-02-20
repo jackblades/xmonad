@@ -38,16 +38,19 @@ import XMonad.Layout.ThreeColumns (ThreeCol(..))
 import XMonad.Prompt
 import XMonad.Prompt.Shell (shellPrompt)
 import XMonad.Prompt.AppLauncher (launchApp)
-import XMonad.Util.EZConfig (additionalKeysP)
+import XMonad.Util.EZConfig (additionalKeysP, additionalMouseBindings)
 import XMonad.Util.SpawnOnce (spawnOnce)
 
 import qualified XMonad.StackSet as W
 import qualified XMonad.Layout.Magnifier as Magnifier
 
-import QsrTile
-import QsrFloatTile
-import QsrFloat
-import XDecoration
+import BorderResize (borderResize)
+import FlexibleResize as Flex (mouseResizeWindow)
+
+import Layout.QsrTile
+import Layout.QsrFloatTile
+import Layout.QsrFloat
+import Layout.XDecoration
 import XState
 import PositionStore
 import Util
@@ -101,7 +104,9 @@ wmserver = do
   spawn "systemctl --user restart quasar-topbar"
   spawn "systemctl --user restart quasar-compton"
 
-  let config = rootConfig `additionalKeysP` keyConfig
+  let config = rootConfig 
+        `additionalKeysP` keyConfig
+        `additionalMouseBindings` mouseConfig
   -- ewmh is needed to get window info in bar
   xmonad $ ewmh config
 
@@ -141,7 +146,7 @@ myLayouts = spaced 3
   $ avoidStruts
   $ mkToggle (GRID ?? EOT)
   $ qsrFloatTile
-    ||| decorateFloat qsrFloat 
+    ||| decorateFloat (borderResize qsrFloat) 
     ||| qsrGTile rectScale40
   where
     spaced d = spacingRaw True (Border d d d d) True (Border d d d d) True
@@ -193,7 +198,10 @@ myManageHook = composeOne
       rectFloat x y w h = doRectFloat $ W.RationalRect x y w h
 
 ------------------------------------------------------------------------------
--- | Keybindings
+-- | key and mouse bindings
+mouseConfig =
+  [ ((,) mod4Mask button1, \w -> focus w >> Flex.mouseResizeWindow w) ]
+
 keyConfig =
   [ ("M-S-q",   shellPrompt promptConfig)
   -- , ("M-S-q",   confirmPrompt promptConfig "exit" (io exitSuccess))
@@ -262,6 +270,7 @@ keyConfig =
   -- apps
   , ("M-e", spawn "thunar /home/ajit")
   , ("M-S-e", spawn "thunar /media/external")
+  , ("M-a", spawn "/etc/rofi-locate")
 
   -- system commands
   , ("M-l", spawn "xautolock -locknow")

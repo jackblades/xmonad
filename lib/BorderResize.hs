@@ -34,7 +34,7 @@ import XMonad.Util.XUtils
 import Control.Monad(when)
 import qualified Data.Map as M
 
-import FlexibleResize
+import Foreign.C.Types
 
 -- $usage
 -- You can use this module with the following in your
@@ -47,15 +47,18 @@ import FlexibleResize
 
 type BorderBlueprint = (Rectangle, Glyph, BorderType)
 
-data BorderType = RightSideBorder
-                    | LeftSideBorder
-                    | TopSideBorder
-                    | BottomSideBorder
-                    deriving (Show, Read, Eq)
-data BorderInfo = BI { bWin :: Window,
-                        bRect :: Rectangle,
-                        bType :: BorderType
-                     } deriving (Show, Read)
+data BorderType 
+  = RightSideBorder
+  | LeftSideBorder
+  | TopSideBorder
+  | BottomSideBorder
+  deriving (Show, Read, Eq)
+
+data BorderInfo = BI 
+  { bWin :: Window
+  , bRect :: Rectangle
+  , bType :: BorderType
+  } deriving (Show, Read)
 
 type RectWithBorders = (Rectangle, [BorderInfo])
 
@@ -67,25 +70,26 @@ brBorderSize = 10
 borderResize :: l a -> ModifiedLayout BorderResize l a
 borderResize = ModifiedLayout (BR M.empty)
 
+-- TODO remove extraneous stuff from here
 instance LayoutModifier BorderResize Window where
     redoLayout _       _ Nothing  wrs = return (wrs, Nothing)
     redoLayout (BR wrsLastTime) _ _ wrs = do
-            let correctOrder = map fst wrs
-                wrsCurrent = M.fromList wrs
-                wrsGone = M.difference wrsLastTime wrsCurrent
-                wrsAppeared = M.difference wrsCurrent wrsLastTime
-                wrsStillThere = M.intersectionWith testIfUnchanged wrsLastTime wrsCurrent
-            handleGone wrsGone
-            wrsCreated <- handleAppeared wrsAppeared
-            let wrsChanged = handleStillThere wrsStillThere
-                wrsThisTime = M.union wrsChanged wrsCreated
-            return (compileWrs wrsThisTime correctOrder, Just $ BR wrsThisTime)
-            -- What we return is the original wrs with the new border
-            -- windows inserted at the correct positions - this way, the core
-            -- will restack the borders correctly.
-            -- We also return information about our borders, so that we
-            -- can handle events that they receive and destroy them when
-            -- they are no longer needed.
+        let correctOrder = map fst wrs
+            wrsCurrent = M.fromList wrs
+            wrsGone = M.difference wrsLastTime wrsCurrent
+            wrsAppeared = M.difference wrsCurrent wrsLastTime
+            wrsStillThere = M.intersectionWith testIfUnchanged wrsLastTime wrsCurrent
+        handleGone wrsGone
+        wrsCreated <- handleAppeared wrsAppeared
+        let wrsChanged = handleStillThere wrsStillThere
+            wrsThisTime = M.union wrsChanged wrsCreated
+        return (compileWrs wrsThisTime correctOrder, Just $ BR wrsThisTime)
+        -- What we return is the original wrs with the new border
+        -- windows inserted at the correct positions - this way, the core
+        -- will restack the borders correctly.
+        -- We also return information about our borders, so that we
+        -- can handle events that they receive and destroy them when
+        -- they are no longer needed.
         where
             testIfUnchanged entry@(rLastTime, _) rCurrent =
                 if rLastTime == rCurrent
@@ -153,43 +157,74 @@ prepareBorders (Rectangle x y wh ht) =
      ((Rectangle x (y + fi ht - fi brBorderSize) wh brBorderSize), xC_bottom_side, BottomSideBorder)
     ]
 
--- handleResize :: [(Window, (BorderType, Window, Rectangle))] -> Event -> X ()
--- handleResize borders ButtonEvent { ev_window = ew, ev_event_type = et }
---     | et == buttonPress, Just (_, win, _) <- lookup ew borders 
---         = mouseResizeEdgeWindow 0.7 win  -- causes the full float mode not the posstore float
--- handleResize _ _ = return ()
-    
--- TODO integrate FlexibleResize code here
+
+-- 
 handleResize :: [(Window, (BorderType, Window, Rectangle))] -> Event -> X ()
 handleResize borders ButtonEvent { ev_window = ew, ev_event_type = et }
-    | et == buttonPress, Just edge <- lookup ew borders =
-    case edge of
-        (RightSideBorder, hostWin, (Rectangle hx hy _ hht)) ->
-            mouseDrag (\x _ -> do
-                            let nwh = max 1 $ fi (x - hx)
-                                rect = Rectangle hx hy nwh hht
-                            focus hostWin
-                            when (x - hx > 0) $ sendMessage (SetGeometry rect)) (focus hostWin)
-        (LeftSideBorder, hostWin, (Rectangle hx hy hwh hht)) ->
-            mouseDrag (\x _ -> do
-                            let nx = max 0 $ min (hx + fi hwh) $ x
-                                nwh = max 1 $ hwh + fi (hx - x)
-                                rect = Rectangle nx hy nwh hht
-                            focus hostWin
-                            when (x < hx + fi hwh) $ sendMessage (SetGeometry rect)) (focus hostWin)
-        (TopSideBorder, hostWin, (Rectangle hx hy hwh hht)) ->
-            mouseDrag (\_ y -> do
-                            let ny = max 0 $ min (hy + fi hht) $ y
-                                nht = max 1 $ hht + fi (hy - y)
-                                rect = Rectangle hx ny hwh nht
-                            focus hostWin
-                            when (y < hy + fi hht) $ sendMessage (SetGeometry rect)) (focus hostWin)
-        (BottomSideBorder, hostWin, (Rectangle hx hy hwh _)) ->
-            mouseDrag (\_ y -> do
-                            let nht = max 1 $ fi (y - hy)
-                                rect = Rectangle hx hy hwh nht
-                            focus hostWin
-                            when (y - hy > 0) $ sendMessage (SetGeometry rect)) (focus hostWin)
+    | et == buttonPress, Just (_, w, _) <- lookup ew borders =
+    whenX (isClient w) $ withDisplay $ \d -> do
+        wa <- io $ getWindowAttributes d w
+        sh <- io $ getWMNormalHints d w
+        (_, _, _, _, _, ix, iy, _) <- io $ queryPointer d w
+        let [pos_x, pos_y, width, height] = map (fi . ($ wa)) [wa_x, wa_y, wa_width, wa_height]
+            west  = findPos ix width
+            north = findPos iy height
+            (cx, fx, gx) = mkSel west  width  pos_x
+            (cy, fy, gy) = mkSel north height pos_y
+        io $ warpPointer d none w 0 0 0 0 cx cy
+        mouseDrag (\ex ey -> do let (nw,nh) = applySizeHintsContents sh (gx ex, gy ey)
+                                let rect = Rectangle (fx nw) (fy nh) nw nh
+                                sendMessage (SetGeometry rect))
+                  (focus w)
+        where
+        edge :: Rational
+        edge = 0
+        
+        findPos :: CInt -> Position -> Maybe Bool
+        findPos m s = if p < 0.5 - edge/2
+            then Just True
+            else if p < 0.5 + edge/2
+                then Nothing
+                else Just False
+            where p = fi m / fi s
+
+        mkSel :: Maybe Bool -> Position -> Position -> (Position, Dimension -> Position, Position -> Dimension)
+        mkSel b k p = case b of
+            Just True ->  (0, (fi k + fi p -).fi, (fi k + fi p -).fi)
+            Nothing ->    (k `div` 2, const p, const $ fi k)
+            Just False -> (k, const p, subtract (fi p) . fi)
+
+
+-- handleResize :: [(Window, (BorderType, Window, Rectangle))] -> Event -> X ()
+-- handleResize borders ButtonEvent { ev_window = ew, ev_event_type = et }
+--     | et == buttonPress, Just edge <- lookup ew borders =
+--     case edge of
+--         (RightSideBorder, hostWin, (Rectangle hx hy _ hht)) ->
+--             mouseDrag (\x _ -> do
+--                             let nwh = max 1 $ fi (x - hx)
+--                                 rect = Rectangle hx hy nwh hht
+--                             focus hostWin
+--                             when (x - hx > 0) $ sendMessage (SetGeometry rect)) (focus hostWin)
+--         (LeftSideBorder, hostWin, (Rectangle hx hy hwh hht)) ->
+--             mouseDrag (\x _ -> do
+--                             let nx = max 0 $ min (hx + fi hwh) $ x
+--                                 nwh = max 1 $ hwh + fi (hx - x)
+--                                 rect = Rectangle nx hy nwh hht
+--                             focus hostWin
+--                             when (x < hx + fi hwh) $ sendMessage (SetGeometry rect)) (focus hostWin)
+--         (TopSideBorder, hostWin, (Rectangle hx hy hwh hht)) ->
+--             mouseDrag (\_ y -> do
+--                             let ny = max 0 $ min (hy + fi hht) $ y
+--                                 nht = max 1 $ hht + fi (hy - y)
+--                                 rect = Rectangle hx ny hwh nht
+--                             focus hostWin
+--                             when (y < hy + fi hht) $ sendMessage (SetGeometry rect)) (focus hostWin)
+--         (BottomSideBorder, hostWin, (Rectangle hx hy hwh _)) ->
+--             mouseDrag (\_ y -> do
+--                             let nht = max 1 $ fi (y - hy)
+--                                 rect = Rectangle hx hy hwh nht
+--                             focus hostWin
+--                             when (y - hy > 0) $ sendMessage (SetGeometry rect)) (focus hostWin)
 handleResize _ _ = return ()
 
 createBorder :: BorderBlueprint -> X (BorderInfo)

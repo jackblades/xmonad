@@ -23,6 +23,8 @@ import XMonad
 import XMonad.Util.XUtils (fi)
 import Foreign.C.Types
 
+import XMonad.Layout.WindowArranger (WindowArrangerMsg(SetGeometry))
+
 -- $usage
 -- To use, first import this module into your @~\/.xmonad\/xmonad.hs@ file:
 --
@@ -50,7 +52,7 @@ mouseResizeEdgeWindow
   -> Window   -- ^ The window to resize.
   -> X ()
 mouseResizeEdgeWindow edge w = whenX (isClient w) $ withDisplay $ \d -> do
-    io $ raiseWindow d w
+    -- io $ raiseWindow d w
     wa <- io $ getWindowAttributes d w
     sh <- io $ getWMNormalHints d w
     (_, _, _, _, _, ix, iy, _) <- io $ queryPointer d w
@@ -62,8 +64,10 @@ mouseResizeEdgeWindow edge w = whenX (isClient w) $ withDisplay $ \d -> do
         (cy, fy, gy) = mkSel north height pos_y
     io $ warpPointer d none w 0 0 0 0 cx cy
     mouseDrag (\ex ey -> do let (nw,nh) = applySizeHintsContents sh (gx ex, gy ey)
-                            io $ moveResizeWindow d w (fx nw) (fy nh) nw nh)
-              (float w)
+                            let rect = Rectangle (fx nw) (fy nh) nw nh
+                            sendMessage (SetGeometry rect))
+                            -- io $ moveResizeWindow d w (fx nw) (fy nh) nw nh)
+              (focus w)  -- (float w)
     where
     findPos :: CInt -> Position -> Maybe Bool
     findPos m s = if p < 0.5 - edge/2
@@ -77,3 +81,6 @@ mouseResizeEdgeWindow edge w = whenX (isClient w) $ withDisplay $ \d -> do
                       Just True ->  (0, (fi k + fi p -).fi, (fi k + fi p -).fi)
                       Nothing ->    (k `div` 2, const p, const $ fi k)
                       Just False -> (k, const p, subtract (fi p) . fi)
+
+
+
